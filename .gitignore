@@ -68,3 +68,7 @@ evaluation_results.csv
 # Cache
 .cache/
 *.pyc
+
+
+
+models/*
