@@ -59,10 +59,14 @@ def parse_schema(schema_str):
     return table_name, columns
 
 
+def quote_col(name):
+    return f"`{name}`" if " " in name else name
+
+
 def structured_to_sql(sel, agg, conds, columns, table_name="table"):
     if sel is None or agg is None:
         return None
-    col_name = columns[sel] if sel < len(columns) else f"col{sel}"
+    col_name = quote_col(columns[sel] if sel < len(columns) else f"col{sel}")
     if agg == 0:
         sql = f"SELECT {col_name} FROM {table_name}"
     else:
@@ -71,7 +75,7 @@ def structured_to_sql(sel, agg, conds, columns, table_name="table"):
     if conds:
         where_parts = []
         for c_idx, c_op, c_val in conds:
-            c_name = columns[c_idx] if c_idx < len(columns) else f"col{c_idx}"
+            c_name = quote_col(columns[c_idx] if c_idx < len(columns) else f"col{c_idx}")
             op_str = OPS[c_op] if c_op < len(OPS) else "="
             try:
                 float(c_val)
