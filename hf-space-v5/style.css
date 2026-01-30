@@ -1,0 +1,253 @@
+/* ============================================
+   Text-to-SQL Demo — Dark Mode (Charcoal)
+   ============================================ */
+
+.gradio-container {
+    max-width: 1100px !important;
+    margin: 0 auto !important;
+}
+
+/* -- Header -- */
+.app-header {
+    text-align: center;
+    padding: 1rem 0 0.25rem;
+}
+.app-header h1 {
+    font-size: 2rem;
+    font-weight: 800;
+    margin: 0;
+}
+.app-header h1 span {
+    background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+.app-header h1 small {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #6b7280;
+    margin-left: 0.3rem;
+}
+
+/* -- Badges -- */
+.tech-badges {
+    display: flex;
+    justify-content: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    margin: 0.5rem 0;
+}
+.badge {
+    padding: 0.25rem 0.65rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    border: 1px solid;
+}
+.badge-indigo  { background: #1e3a5f; color: #93c5fd; border-color: #2563eb30; }
+.badge-purple  { background: #2e1065; color: #c4b5fd; border-color: #7c3aed30; }
+.badge-emerald { background: #064e3b; color: #6ee7b7; border-color: #05966930; }
+.badge-amber   { background: #451a03; color: #fbbf24; border-color: #d9770630; }
+
+/* -- Pipeline strip -- */
+.pipeline-strip {
+    background: #111827;
+    border: 1px solid #1f2937;
+    border-radius: 10px;
+    padding: 0.6rem 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    flex-wrap: wrap;
+    margin: 0.5rem 0 0.75rem;
+}
+.pipeline-strip .step {
+    padding: 0.25rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    font-family: 'Fira Code', monospace;
+}
+.pipeline-strip .step-input  { background: #1e3a5f; color: #7dd3fc; }
+.pipeline-strip .step-model  { background: #2e1065; color: #c4b5fd; }
+.pipeline-strip .step-struct { background: #422006; color: #fbbf24; }
+.pipeline-strip .step-sql    { background: #14532d; color: #86efac; }
+.pipeline-strip .arrow       { color: #4b5563; font-size: 1rem; }
+
+/* -- SQL output -- */
+.sql-output textarea {
+    font-family: 'Fira Code', 'Cascadia Code', monospace !important;
+    font-size: 1.1rem !important;
+    background: #0a0a0f !important;
+    color: #e2e8f0 !important;
+    border: 1px solid #1f2937 !important;
+    border-radius: 10px !important;
+    padding: 1rem !important;
+    line-height: 1.5 !important;
+}
+
+/* -- Decode boxes -- */
+.decode-box textarea {
+    font-family: 'Fira Code', monospace !important;
+    font-size: 0.85rem !important;
+    background: #111827 !important;
+    color: #d1d5db !important;
+    border: 1px solid #1f2937 !important;
+    border-radius: 8px !important;
+}
+
+/* -- Generate button -- */
+.generate-btn {
+    background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%) !important;
+    border: none !important;
+    color: #fff !important;
+    font-weight: 700 !important;
+    font-size: 1rem !important;
+    border-radius: 10px !important;
+    min-height: 46px !important;
+    box-shadow: 0 2px 12px rgba(59, 130, 246, 0.3) !important;
+    transition: all 0.2s ease !important;
+}
+.generate-btn:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 20px rgba(59, 130, 246, 0.45) !important;
+}
+
+/* -- Hint text -- */
+.input-hint {
+    font-size: 0.8rem;
+    color: #6b7280 !important;
+    margin-top: -0.3rem;
+}
+.input-hint code {
+    background: #1f2937;
+    color: #93c5fd;
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+    font-size: 0.78rem;
+}
+
+/* -- Tab content cards -- */
+.arch-card {
+    background: #111827;
+    border: 1px solid #1f2937;
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin-bottom: 0.75rem;
+}
+.arch-card h3 {
+    color: #f3f4f6 !important;
+    margin: 0 0 0.6rem 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+.arch-card p,
+.arch-card li {
+    color: #d1d5db !important;
+    font-size: 0.92rem;
+    line-height: 1.55;
+}
+.arch-card strong {
+    color: #f3f4f6 !important;
+}
+.arch-card code {
+    background: #1f2937;
+    color: #93c5fd !important;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.82rem;
+    font-family: 'Fira Code', monospace;
+}
+.arch-card a {
+    color: #60a5fa !important;
+}
+.arch-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+@media (max-width: 768px) {
+    .arch-grid { grid-template-columns: 1fr; }
+}
+
+/* -- Reference table -- */
+.encoding-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #1f2937;
+    font-size: 0.88rem;
+}
+.encoding-table th {
+    background: #0a0a0f;
+    color: #f3f4f6 !important;
+    padding: 0.6rem 0.8rem;
+    text-align: left;
+    font-weight: 600;
+}
+.encoding-table td {
+    padding: 0.5rem 0.8rem;
+    border-bottom: 1px solid #1f2937;
+    color: #d1d5db !important;
+    background: #0d1117;
+}
+.encoding-table tr:last-child td { border-bottom: none; }
+.encoding-table tr:nth-child(even) td { background: #111827; }
+.encoding-table .mono {
+    font-family: 'Fira Code', monospace;
+    color: #60a5fa !important;
+    font-weight: 600;
+}
+.encoding-table strong {
+    color: #f3f4f6 !important;
+}
+
+/* -- Stats cards -- */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.6rem;
+    margin: 0.75rem 0;
+}
+@media (max-width: 768px) {
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+}
+.stat-card {
+    background: #111827;
+    border: 1px solid #1f2937;
+    border-radius: 10px;
+    padding: 0.9rem;
+    text-align: center;
+}
+.stat-card .stat-value {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: #60a5fa !important;
+}
+.stat-card .stat-label {
+    font-size: 0.72rem;
+    color: #6b7280 !important;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 0.15rem;
+}
+
+/* -- Footer -- */
+.app-footer {
+    text-align: center;
+    padding: 1rem;
+    margin-top: 0.75rem;
+    border-top: 1px solid #1f2937;
+    font-size: 0.8rem;
+    color: #4b5563 !important;
+}
+.app-footer a {
+    color: #60a5fa !important;
+}
+
+footer { display: none !important; }
