@@ -1,0 +1,10 @@
+How many singers do we have?	select count(*) , count(*) from singer  group by singer.singer_id  order by count(*) desc limit 1
+What is the total number of singers?	select count ( singer.* ) , count ( singer.* ) , count ( singer_in_concert
+Show name, country, age for all singers ordered by age from the oldest to the youngest.	select singer.name from singer  group by singer.name  order by count(*) desc limit 1
+What are the names, countries, and ages for every singer in descending order of age?	select singer.name , singer.country from singer  group by singer.Singer_ID  order by count(*) desc limit 1
+What is the average, minimum, and maximum age of all singers from France?	select avg(singer.age) , min(singer.age) , max(singer.age) from singer  group by singer.age  order by count(*) desc limit 1
+What is the average, minimum, and maximum age for all French singers?	select avg(singer.age) , min(singer.age) , max(singer.age) from singer  group by singer.age  order by count(*) desc limit 1
+Show the name and the release year of the song by the youngest singer.	select singer.song_release_year , singer.song_release_year , singer.song_release_year from singer  group by singer.song_release_year  order by count(*) desc limit 1
+What are the names and release years for all the songs of the youngest singer?	select singer.song_release_year , singer.song_release_year , singer.song_release_year , singer.song_release_year from singer  group by singer.song_release_year  order by count(*) desc limit 1
+What are all distinct countries where singers above age 20 are from?	select singer.Country , distinct country.Country
+What are  the different countries with singers above age 20?	select singer.country , singer.country , singer.country , singer.country from singer  group by singer.country  order by count(*) desc limit 1

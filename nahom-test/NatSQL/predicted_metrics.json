@@ -1,0 +1,81 @@
+{
+  "summary": {
+    "count": 10,
+    "exact_match": 0,
+    "exact_match_normalized": 0,
+    "exact_match_rate": 0.0,
+    "exact_match_normalized_rate": 0.0
+  },
+  "rows": [
+    {
+      "question": "How many singers do we have?",
+      "prediction": "select count(*) , count(*) from singer  group by singer.singer_id  order by count(*) desc limit 1",
+      "gold": "SELECT count(*) FROM singer",
+      "exact_match": false,
+      "exact_match_normalized": false
+    },
+    {
+      "question": "What is the total number of singers?",
+      "prediction": "select count ( singer.* ) , count ( singer.* ) , count ( singer_in_concert",
+      "gold": "SELECT count(*) FROM singer",
+      "exact_match": false,
+      "exact_match_normalized": false
+    },
+    {
+      "question": "Show name, country, age for all singers ordered by age from the oldest to the youngest.",
+      "prediction": "select singer.name from singer  group by singer.name  order by count(*) desc limit 1",
+      "gold": "SELECT name ,  country ,  age FROM singer ORDER BY age DESC",
+      "exact_match": false,
+      "exact_match_normalized": false
+    },
+    {
+      "question": "What are the names, countries, and ages for every singer in descending order of age?",
+      "prediction": "select singer.name , singer.country from singer  group by singer.Singer_ID  order by count(*) desc limit 1",
+      "gold": "SELECT name ,  country ,  age FROM singer ORDER BY age DESC",
+      "exact_match": false,
+      "exact_match_normalized": false
+    },
+    {
+      "question": "What is the average, minimum, and maximum age of all singers from France?",
+      "prediction": "select avg(singer.age) , min(singer.age) , max(singer.age) from singer  group by singer.age  order by count(*) desc limit 1",
+      "gold": "SELECT avg(age) ,  min(age) ,  max(age) FROM singer WHERE country  =  'France'",
+      "exact_match": false,
+      "exact_match_normalized": false
+    },
+    {
+      "question": "What is the average, minimum, and maximum age for all French singers?",
+      "prediction": "select avg(singer.age) , min(singer.age) , max(singer.age) from singer  group by singer.age  order by count(*) desc limit 1",
+      "gold": "SELECT avg(age) ,  min(age) ,  max(age) FROM singer WHERE country  =  'France'",
+      "exact_match": false,
+      "exact_match_normalized": false
+    },
+    {
+      "question": "Show the name and the release year of the song by the youngest singer.",
+      "prediction": "select singer.song_release_year , singer.song_release_year , singer.song_release_year from singer  group by singer.song_release_year  order by count(*) desc limit 1",
+      "gold": "SELECT song_name ,  song_release_year FROM singer ORDER BY age LIMIT 1",
+      "exact_match": false,
+      "exact_match_normalized": false
+    },
+    {
+      "question": "What are the names and release years for all the songs of the youngest singer?",
+      "prediction": "select singer.song_release_year , singer.song_release_year , singer.song_release_year , singer.song_release_year from singer  group by singer.song_release_year  order by count(*) desc limit 1",
+      "gold": "SELECT song_name ,  song_release_year FROM singer ORDER BY age LIMIT 1",
+      "exact_match": false,
+      "exact_match_normalized": false
+    },
+    {
+      "question": "What are all distinct countries where singers above age 20 are from?",
+      "prediction": "select singer.Country , distinct country.Country",
+      "gold": "SELECT DISTINCT country FROM singer WHERE age  >  20",
+      "exact_match": false,
+      "exact_match_normalized": false
+    },
+    {
+      "question": "What are  the different countries with singers above age 20?",
+      "prediction": "select singer.country , singer.country , singer.country , singer.country from singer  group by singer.country  order by count(*) desc limit 1",
+      "gold": "SELECT DISTINCT country FROM singer WHERE age  >  20",
+      "exact_match": false,
+      "exact_match_normalized": false
+    }
+  ]
+}
