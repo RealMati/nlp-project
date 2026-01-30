@@ -9,9 +9,11 @@ import sqlite3
 import sqlparse
 import json
 import time
+import torch
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, Dict, List, Tuple
+from transformers import T5ForConditionalGeneration, AutoTokenizer
 import os
 
 # Page configuration
@@ -21,6 +23,79 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# --- MODEL LOADING (lazy, cached) ---
+@st.cache_resource
+def load_model():
+    """Load the fine-tuned T5 model for Text-to-SQL"""
+    model_path = Path(__file__).parent / "models" / "t2sql_v4"
+    tokenizer = AutoTokenizer.from_pretrained(str(model_path))
+    model = T5ForConditionalGeneration.from_pretrained(str(model_path))
+    model.eval()
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model.to(device)
+    return model, tokenizer, device
+
+# --- REAL SQL GENERATION ---
+def generate_sql_real(natural_language: str, database: str, temperature: float, beam_size: int) -> Dict:
+    """
+    Generate SQL using the fine-tuned T5 model
+    """
+    start_time = time.time()
+
+    # Get schema from database
+    try:
+        conn = sqlite3.connect(database)
+        cursor = conn.cursor()
+
+        # Get table names
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        tables = [row[0] for row in cursor.fetchall()]
+
+        # Get columns for each table
+        schema_parts = []
+        for table in tables:
+            cursor.execute(f"PRAGMA table_info({table})")
+            columns = [row[1] for row in cursor.fetchall()]
+            schema_parts.append(f"{table}({', '.join(columns)})")
+
+        schema_str = " | ".join(schema_parts)
+        conn.close()
+    except Exception:
+        schema_str = "database"
+
+    # Format input for T5
+    input_text = f"translate to SQL: {natural_language} | schema: {schema_str}"
+
+    # Load model
+    model, tokenizer, device = load_model()
+
+    # Tokenize
+    inputs = tokenizer(input_text, return_tensors="pt", max_length=512, truncation=True).to(device)
+
+    # Generate
+    with torch.no_grad():
+        outputs = model.generate(
+            **inputs,
+            max_length=256,
+            temperature=temperature,
+            num_beams=beam_size,
+            do_sample=temperature > 0,
+        )
+
+    generated_sql = tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+    # Calculate confidence (heuristic based on length/repetition)
+    confidence = min(0.95, max(0.5, 1.0 - (abs(len(generated_sql) - 100) / 200)))
+
+    return {
+        "sql": generated_sql,
+        "confidence": confidence,
+        "tokens_generated": len(generated_sql.split()),
+        "generation_time": time.time() - start_time,
+        "beam_size": beam_size,
+        "temperature": temperature
+    }
 
 # Custom CSS for professional styling
 st.markdown("""
@@ -177,63 +252,46 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-# Example queries with categories
+# Example queries with categories (based on test_hard_database.db)
 EXAMPLE_QUERIES = {
-    "Basic Queries": [
-        "Show all students with GPA above 3.5",
-        "List all courses offered in the Computer Science department",
-        "Find students who are older than 20 years",
-        "Display all employees hired after 2020"
+    "Level 1 (Easy)": [
+        "List all employees with their department names",
+        "Show all projects along with the department managing them",
+        "Display employees hired after 2020",
+        "List all active projects"
     ],
-    "Aggregations": [
-        "What is the average salary by department?",
-        "How many students are enrolled in each major?",
-        "Count the number of courses per instructor",
-        "Calculate the total revenue by product category"
+    "Level 2 (Medium)": [
+        "Find the total salary budget per department",
+        "Count how many employees work in each department",
+        "Calculate the average salary per department",
+        "Show total project budget by department"
     ],
-    "Joins": [
-        "List all professors and their courses",
-        "Show students and their enrolled courses",
-        "Display employees with their department names",
-        "Find orders with customer details"
+    "Level 3 (Hard)": [
+        "Find employees who earn more than the average salary in Engineering",
+        "List projects that are over budget",
+        "Find employees who have not been assigned to any project",
+        "Show departments with budget over $300,000"
     ],
-    "Complex Queries": [
-        "Which departments have more than 10 employees?",
-        "Find the top 5 highest-paid employees in each department",
-        "Show courses with no enrolled students",
-        "List students who have taken all required courses"
+    "Level 4 (Very Hard)": [
+        "For each project, show total hours worked",
+        "Find the top 3 departments with highest total project hours",
+        "List clients who have placed orders totaling over $50,000",
+        "Show projects with their total assignment costs"
+    ],
+    "Level 5 (Extreme)": [
+        "Find employees who are managers and whose team has total project hours exceeding 300 hours",
+        "List all employees with their project hours and salary",
+        "Find the department with the highest cost efficiency",
+        "Show employees who are managers with teams over budget"
     ]
 }
 
 
 # Database schemas for different sample databases
-DATABASE_SCHEMAS = {
-    "university": {
-        "description": "Academic database with students, courses, professors, and enrollments",
-        "tables": {
-            "students": ["id", "name", "age", "gpa", "major", "enrollment_year"],
-            "professors": ["id", "name", "department", "hire_date", "salary"],
-            "courses": ["id", "course_name", "course_code", "credits", "professor_id", "department"],
-            "enrollments": ["id", "student_id", "course_id", "semester", "grade"]
-        }
-    },
-    "company": {
-        "description": "Corporate database with employees, departments, and projects",
-        "tables": {
-            "employees": ["id", "name", "position", "department_id", "salary", "hire_date"],
-            "departments": ["id", "name", "location", "budget", "manager_id"],
-            "projects": ["id", "name", "start_date", "end_date", "budget", "department_id"],
-            "assignments": ["id", "employee_id", "project_id", "role", "hours"]
-        }
-    },
-    "ecommerce": {
-        "description": "E-commerce database with products, customers, and orders",
-        "tables": {
-            "customers": ["id", "name", "email", "address", "registration_date"],
-            "products": ["id", "name", "category", "price", "stock", "supplier_id"],
-            "orders": ["id", "customer_id", "order_date", "total_amount", "status"],
-            "order_items": ["id", "order_id", "product_id", "quantity", "price"]
-        }
+DATABASES = {
+    "test_hard": {
+        "file": "test_hard_database.db",
+        "description": "Complex test database with employees, departments, projects, assignments, salaries, clients, and orders"
     }
 }
 
@@ -241,14 +299,14 @@ DATABASE_SCHEMAS = {
 @st.cache_resource
 def load_model_placeholder():
     """
-    Placeholder for model loading - replace with actual model loading logic
-    In production, this would load the fine-tuned T5/BART model
+    Load the fine-tuned T5 model
     """
-    time.sleep(1)  # Simulate loading time
+    model, tokenizer, device = load_model()
     return {
-        "model": "t5-base-finetuned",
+        "model": "t2sql_v4 (T5-base)",
         "status": "ready",
-        "version": "1.0.0"
+        "device": device,
+        "parameters": f"{model.num_parameters():,}"
     }
 
 
@@ -264,45 +322,13 @@ def initialize_session_state():
         st.session_state.generated_sql = None
     if 'execution_results' not in st.session_state:
         st.session_state.execution_results = None
+    if 'selected_example' not in st.session_state:
+        st.session_state.selected_example = None
+    if 'nl_input' not in st.session_state:
+        st.session_state.nl_input = ''
 
 
-def generate_sql_mock(natural_language: str, database: str, temperature: float, beam_size: int) -> Dict:
-    """
-    Mock SQL generation - replace with actual model inference
-    This demonstrates the expected interface for the real model
-    """
-    time.sleep(0.5)  # Simulate inference time
-
-    # Simple keyword-based mock generation
-    sql_query = ""
-    confidence = 0.0
-
-    nl_lower = natural_language.lower()
-
-    if "gpa above" in nl_lower and "3.5" in nl_lower:
-        sql_query = "SELECT * FROM students WHERE gpa > 3.5"
-        confidence = 0.95
-    elif "average salary" in nl_lower and "department" in nl_lower:
-        sql_query = "SELECT department, AVG(salary) as avg_salary FROM employees GROUP BY department"
-        confidence = 0.92
-    elif "professors" in nl_lower and "courses" in nl_lower:
-        sql_query = "SELECT p.name as professor, c.course_name FROM professors p JOIN courses c ON p.id = c.professor_id"
-        confidence = 0.88
-    elif "students" in nl_lower and "enrolled" in nl_lower and "major" in nl_lower:
-        sql_query = "SELECT major, COUNT(*) as student_count FROM students GROUP BY major"
-        confidence = 0.90
-    else:
-        sql_query = f"-- SQL generation pending model implementation\n-- Input: {natural_language}"
-        confidence = 0.50
-
-    return {
-        "sql": sql_query,
-        "confidence": confidence,
-        "tokens_generated": len(sql_query.split()),
-        "generation_time": 0.5,
-        "beam_size": beam_size,
-        "temperature": temperature
-    }
+# generate_sql_mock removed - using real model via generate_sql_real()
 
 
 def validate_sql(sql: str) -> Tuple[bool, Optional[str]]:
@@ -326,9 +352,9 @@ def validate_sql(sql: str) -> Tuple[bool, Optional[str]]:
         return False, f"Syntax error: {str(e)}"
 
 
-def execute_sql_mock(sql: str, database: str) -> Tuple[bool, Optional[pd.DataFrame], Optional[str]]:
+def execute_sql_real(sql: str, db_path: str) -> Tuple[bool, Optional[pd.DataFrame], Optional[str]]:
     """
-    Mock SQL execution - replace with actual database execution
+    Execute SQL on real database
     Returns: (success, dataframe, error_message)
     """
     try:
@@ -337,64 +363,43 @@ def execute_sql_mock(sql: str, database: str) -> Tuple[bool, Optional[pd.DataFra
         if not is_valid:
             return False, None, error_msg
 
-        # Mock data for demonstration
-        if "students" in sql.lower() and "gpa" in sql.lower():
-            mock_data = pd.DataFrame({
-                'id': [1, 2, 3, 4],
-                'name': ['Alice Johnson', 'Bob Smith', 'Carol White', 'David Brown'],
-                'age': [20, 21, 22, 20],
-                'gpa': [3.8, 3.9, 3.7, 3.6],
-                'major': ['Computer Science', 'Mathematics', 'Physics', 'Computer Science'],
-                'enrollment_year': [2022, 2021, 2022, 2023]
-            })
-            return True, mock_data, None
+        # Execute on real database
+        conn = sqlite3.connect(db_path)
+        df = pd.read_sql_query(sql, conn)
+        conn.close()
 
-        elif "department" in sql.lower() and "avg" in sql.lower():
-            mock_data = pd.DataFrame({
-                'department': ['Engineering', 'Sales', 'Marketing', 'HR', 'IT'],
-                'avg_salary': [95000, 75000, 70000, 65000, 85000]
-            })
-            return True, mock_data, None
-
-        elif "professor" in sql.lower() and "course" in sql.lower():
-            mock_data = pd.DataFrame({
-                'professor': ['Dr. Smith', 'Dr. Johnson', 'Dr. Williams', 'Dr. Brown'],
-                'course_name': ['Database Systems', 'Machine Learning', 'Algorithms', 'Data Structures']
-            })
-            return True, mock_data, None
-
-        elif "major" in sql.lower() and "count" in sql.lower():
-            mock_data = pd.DataFrame({
-                'major': ['Computer Science', 'Mathematics', 'Physics', 'Engineering'],
-                'student_count': [45, 32, 28, 38]
-            })
-            return True, mock_data, None
-
-        else:
-            # Generic mock result
-            mock_data = pd.DataFrame({
-                'result': ['Query executed successfully'],
-                'note': ['Replace with actual database connection']
-            })
-            return True, mock_data, None
+        return True, df, None
 
     except Exception as e:
         return False, None, f"Execution error: {str(e)}"
 
 
-def display_schema_info(database: str):
-    """Display database schema information in an expandable section"""
-    schema = DATABASE_SCHEMAS.get(database, {})
+def display_schema_info(db_path: str):
+    """Display database schema information by reading actual database"""
+    try:
+        import sqlite3
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
 
-    st.markdown(f"### 📊 Database: {database.title()}")
-    st.markdown(f"*{schema.get('description', 'No description available')}*")
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        tables = [row[0] for row in cursor.fetchall()]
 
-    with st.expander("📋 View Schema Details", expanded=False):
-        for table_name, columns in schema.get('tables', {}).items():
-            st.markdown(f"**`{table_name}`**")
-            cols_display = ", ".join([f"`{col}`" for col in columns])
-            st.markdown(f"  {cols_display}")
-            st.markdown("---")
+        st.markdown(f"### 📊 Database Schema")
+        st.markdown(f"*{DATABASES.get('test_hard', {}).get('description', 'Custom database')}*")
+
+        with st.expander("📋 View Schema Details", expanded=False):
+            for table in tables:
+                cursor.execute(f"PRAGMA table_info({table})")
+                columns = [row[1] for row in cursor.fetchall()]
+                st.markdown(f"**`{table}`**")
+                cols_display = ", ".join([f"`{col}`" for col in columns])
+                st.markdown(f"  {cols_display}")
+                st.markdown("---")
+
+        conn.close()
+    except Exception as e:
+        st.markdown(f"### 📊 Database Schema")
+        st.markdown(f"*{DATABASES.get('test_hard', {}).get('description', 'Custom database')}*")
 
 
 def format_sql_with_syntax_highlighting(sql: str) -> str:
@@ -429,11 +434,13 @@ def main():
         # Database selection
         selected_db = st.selectbox(
             "Select Database",
-            options=list(DATABASE_SCHEMAS.keys()),
-            format_func=lambda x: x.title(),
+            options=list(DATABASES.keys()),
+            format_func=lambda x: x.replace('_', ' ').title(),
             key="database_selector"
         )
-        st.session_state.current_database = selected_db
+        db_file = DATABASES[selected_db]["file"]
+        db_path = str(Path(__file__).parent / db_file)
+        st.session_state.current_database = db_path
 
         st.markdown("---")
 
@@ -474,7 +481,8 @@ def main():
             st.markdown('<span class="status-badge status-success">✓ Model Ready</span>', unsafe_allow_html=True)
             model_info = load_model_placeholder()
             st.markdown(f"**Model:** {model_info['model']}")
-            st.markdown(f"**Version:** {model_info['version']}")
+            st.markdown(f"**Device:** {model_info['device']}")
+            st.markdown(f"**Parameters:** {model_info['parameters']}")
 
         st.markdown("---")
 
@@ -522,18 +530,23 @@ def main():
         with cols[idx % 2]:
             if st.button(f"📝 {example}", key=f"example_{idx}", use_container_width=True):
                 st.session_state.selected_example = example
+                st.rerun()
 
     st.markdown("---")
 
     # Natural language input
     st.markdown("## 🎯 Enter Your Query")
 
-    default_text = st.session_state.get('selected_example', '')
+    # Sync selected_example to nl_input
+    if 'selected_example' in st.session_state and st.session_state.selected_example:
+        st.session_state.nl_input = st.session_state.selected_example
+        st.session_state.selected_example = None
+
     natural_language = st.text_area(
         "Describe what you want to query in natural language",
-        value=default_text,
+        value=st.session_state.get('nl_input', ''),
         height=100,
-        placeholder="e.g., Show all students with GPA above 3.5",
+        placeholder="e.g., List all employees with their department names",
         key="nl_input"
     )
 
@@ -547,7 +560,8 @@ def main():
         if st.button("🗑️ Clear", use_container_width=True):
             st.session_state.generated_sql = None
             st.session_state.execution_results = None
-            st.session_state.selected_example = ''
+            st.session_state.selected_example = None
+            st.session_state.nl_input = ''
             st.rerun()
 
     # Generate SQL
@@ -556,7 +570,7 @@ def main():
             st.warning("⚠️ Please load the model first from the sidebar")
         else:
             with st.spinner("🤖 Generating SQL query..."):
-                result = generate_sql_mock(
+                result = generate_sql_real(
                     natural_language,
                     st.session_state.current_database,
                     temperature,
@@ -617,7 +631,7 @@ def main():
         if st.button("▶️ Execute Query", type="primary", use_container_width=True, disabled=not is_valid):
             with st.spinner("⚡ Executing query..."):
                 start_time = time.time()
-                success, df, error = execute_sql_mock(result['sql'], st.session_state.current_database)
+                success, df, error = execute_sql_real(result['sql'], st.session_state.current_database)
                 execution_time = time.time() - start_time
 
                 st.session_state.execution_results = {
