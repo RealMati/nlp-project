@@ -1,0 +1,130 @@
+.main-header {
+    text-align: center;
+    margin-bottom: 0.5rem;
+}
+.main-header h1 {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-size: 2.4rem;
+    font-weight: 800;
+    margin-bottom: 0.25rem;
+}
+.main-header p {
+    color: #374151;
+    font-size: 1.05rem;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+/* Pipeline visualization */
+.pipeline-box {
+    background: #1e1e2e;
+    border: 1px solid #313244;
+    border-radius: 12px;
+    padding: 1rem 1.5rem;
+    text-align: center;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.95rem;
+    color: #cdd6f4;
+    margin-bottom: 1rem;
+    letter-spacing: 0.02em;
+}
+.pipeline-box .arrow {
+    color: #a6adc8;
+    margin: 0 0.3rem;
+}
+.pipeline-box .stage {
+    color: #b4befe;
+    font-weight: 600;
+}
+.pipeline-box .highlight {
+    color: #f9e2af;
+    font-weight: 600;
+}
+
+/* SQL output - dark code block */
+.sql-output textarea {
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace !important;
+    font-size: 1.1rem !important;
+    background: #1e1e2e !important;
+    color: #cdd6f4 !important;
+    border: 1px solid #45475a !important;
+    border-radius: 10px !important;
+    padding: 1rem !important;
+}
+.sql-output label span {
+    color: #374151 !important;
+}
+
+/* Raw output - muted style */
+.raw-output textarea {
+    font-family: 'SF Mono', 'Fira Code', monospace !important;
+    font-size: 0.9rem !important;
+    background: #f1f5f9 !important;
+    color: #1e293b !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 8px !important;
+}
+.raw-output label span {
+    color: #374151 !important;
+}
+
+/* Generate button */
+.generate-btn {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    border: none !important;
+    color: white !important;
+    font-weight: 600 !important;
+    font-size: 1.05rem !important;
+    padding: 0.75rem 2rem !important;
+    border-radius: 10px !important;
+    min-height: 46px !important;
+}
+.generate-btn:hover {
+    opacity: 0.92 !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4) !important;
+}
+
+/* Info badges */
+.info-badge {
+    display: inline-block;
+    background: #e0e7ff;
+    color: #3730a3;
+    padding: 0.25rem 0.7rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+/* Force all label text to be dark */
+label span, .label-wrap span {
+    color: #1f2937 !important;
+}
+
+/* Section headers */
+.section-header {
+    color: #1f2937 !important;
+    font-weight: 700;
+}
+
+/* Slider labels and info text */
+.info-text, .slider-label {
+    color: #4b5563 !important;
+}
+
+/* Footer */
+.footer-section {
+    text-align: center;
+    margin-top: 1.5rem;
+    padding: 1rem;
+    color: #6b7280;
+    font-size: 0.85rem;
+}
+.footer-section a {
+    color: #667eea;
+}
+
+/* Hide default Gradio footer */
+footer { display: none !important; }
