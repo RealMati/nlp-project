@@ -5,16 +5,35 @@ Professional Streamlit interface for natural language to SQL conversion
 
 import streamlit as st
 import pandas as pd
-import sqlite3
-import sqlparse
 import json
+import os
+import sys
 import time
-import torch
+import random
+import re
+import sqlparse
+from typing import Dict, List, Any, Tuple, Optional
 from pathlib import Path
 from datetime import datetime
-from typing import Optional, Dict, List, Tuple
-from transformers import T5ForConditionalGeneration, AutoTokenizer
+try:
+    import torch
+    from transformers import T5ForConditionalGeneration, AutoTokenizer
+    T5_AVAILABLE = True
+except ImportError:
+    T5_AVAILABLE = False
+    # Mock classes to prevent NameErrors later
+    T5ForConditionalGeneration = None
+    AutoTokenizer = None
+    torch = None
 import os
+import sys
+
+# Add project root to path for src imports if needed
+sys.path.append(os.path.abspath(os.path.dirname(__file__)))
+try:
+    from src.llm_integration.pipeline import LLMPipeline
+except ImportError:
+    LLMPipeline = None # Fallback if deps missing
 
 # Page configuration
 st.set_page_config(
@@ -27,14 +46,38 @@ st.set_page_config(
 # --- MODEL LOADING (lazy, cached) ---
 @st.cache_resource
 def load_model():
-    """Load the fine-tuned T5 model for Text-to-SQL"""
-    model_path = Path(__file__).parent / "models" / "t2sql_v4"
-    tokenizer = AutoTokenizer.from_pretrained(str(model_path))
-    model = T5ForConditionalGeneration.from_pretrained(str(model_path))
-    model.eval()
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    model.to(device)
-    return model, tokenizer, device
+    """
+    Load the model and tokenizer
+    """
+    try:
+        if not T5_AVAILABLE:
+            # Model is unavailable due to missing dependencies
+            return None, None, None
+
+        model_path = Path("save/")
+        if not model_path.exists():
+            # Fallback to base model
+            model_path = "t5-base"
+
+        tokenizer = AutoTokenizer.from_pretrained(str(model_path))
+        model = T5ForConditionalGeneration.from_pretrained(str(model_path))
+
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        model = model.to(device)
+
+        return model, tokenizer, device
+    except Exception as e:
+        st.error(f"Error loading model: {e}")
+        return None, None, None
+
+
+def load_llm_pipeline():
+    try:
+        from src.llm_integration import LLMPipeline
+        return LLMPipeline()
+    except Exception as e:
+        st.error(f"Error loading Gemini LLM: {e}")
+        return None
 
 # --- REAL SQL GENERATION ---
 def generate_sql_real(natural_language: str, database: str, temperature: float, beam_size: int) -> Dict:
@@ -69,6 +112,18 @@ def generate_sql_real(natural_language: str, database: str, temperature: float, 
 
     # Load model
     model, tokenizer, device = load_model()
+
+    if model is None or tokenizer is None:
+        # Avoid crashing if dependencies missing
+        return {
+            "sql": "-- Error: T5 Model unavailable (torch/transformers missing).\n-- Use LLM Mode in Sidebar.",
+            "confidence": 0.0,
+            "generation_time": 0.0,
+            "tokens_generated": 0,
+            "beam_size": 0,
+            "temperature": 0.0,
+            "steps": ["Model loading failed"]
+        }
 
     # Tokenize
     inputs = tokenizer(input_text, return_tensors="pt", max_length=512, truncation=True).to(device)
@@ -299,14 +354,35 @@ DATABASES = {
 @st.cache_resource
 def load_model_placeholder():
     """
-    Load the fine-tuned T5 model
+    Placeholder function to load the model and display a spinner
     """
-    model, tokenizer, device = load_model()
+    with st.spinner("Loading models..."):
+        model, tokenizer, device = load_model()
+        llm_pipeline = load_llm_pipeline()
+
+    success_msg = ""
+    status = "ready"
+    if model:
+        success_msg += "✅ T5 Loaded. "
+    else:
+        success_msg += "⚠️ T5 Missing. "
+        status = "partial"
+        
+    if llm_pipeline:
+        success_msg += "✅ Gemini Ready."
+    else:
+        success_msg += "❌ Gemini Failed."
+        
+    st.sidebar.success(success_msg)
+    
     return {
-        "model": "t2sql_v4 (T5-base)",
-        "status": "ready",
-        "device": device,
-        "parameters": f"{model.num_parameters():,}"
+        "t5": (model, tokenizer, device), 
+        "llm": llm_pipeline,
+        "status": status,
+        "llm_status": "Ready" if llm_pipeline else "Failed",
+        "model": "T5-Base" if model else "None",  # for backwards compatibility if needed
+        "device": str(device) if device else "N/A",
+        "parameters": "N/A"
     }
 
 
@@ -444,8 +520,18 @@ def main():
 
         st.markdown("---")
 
+        # Model Selection
+        st.markdown("### 🧠 Model Selection")
+        model_selection = st.radio(
+            "Choose Model",
+            ["T5-Base (Fine-tuned)", "LLM (In-Context Learning)"],
+            index=0,
+            key="model_selector"
+        )
+        st.session_state.model_type = "llm" if "LLM" in model_selection else "t5"
+
         # Model settings
-        st.markdown("### 🤖 Model Settings")
+        st.markdown("### 🤖 Generation Settings")
 
         temperature = st.slider(
             "Temperature",
@@ -472,17 +558,44 @@ def main():
 
         if not st.session_state.model_loaded:
             if st.button("🔄 Load Model"):
-                with st.spinner("Loading model..."):
-                    model_info = load_model_placeholder()
+                with st.spinner(f"Loading {st.session_state.model_type.upper()} model..."):
+                    if st.session_state.model_type == "t5":
+                        model_info = load_model_placeholder()
+                    else:
+                        # Load LLM
+                        pipeline = load_llm_pipeline()
+                        if pipeline:
+                            model_info = {
+                                "model": f"LLM ({os.getenv('LLM_MODEL_NAME', 'GPT-4o')})", 
+                                "status": "connected",
+                                "device": "API",
+                                "parameters": "N/A"
+                            }
+                        else:
+                            st.error("Failed to load LLM Pipeline (check logs/imports).")
+                            model_info = {"model": "Error", "device": "None", "parameters": "0"}
+                    
                     st.session_state.model_loaded = True
+                    st.session_state.loaded_model_type = st.session_state.model_type
+                
                 st.success("Model loaded successfully!")
                 st.json(model_info)
         else:
+            # Check if model type changed
+            if getattr(st.session_state, 'loaded_model_type', 't5') != st.session_state.model_type:
+                st.warning("Model type changed. Please reload.")
+                st.session_state.model_loaded = False
+                st.rerun()
+
             st.markdown('<span class="status-badge status-success">✓ Model Ready</span>', unsafe_allow_html=True)
             model_info = load_model_placeholder()
-            st.markdown(f"**Model:** {model_info['model']}")
-            st.markdown(f"**Device:** {model_info['device']}")
-            st.markdown(f"**Parameters:** {model_info['parameters']}")
+    
+            st.markdown(f"**T5 Status:** {model_info.get('status', 'Unavailable')}")
+            st.markdown(f"**LLM Status:** {model_info.get('llm_status', 'Unknown')}")
+            
+            # Initialize session state (but don't rely on model being loaded for LLM only)
+            initialize_session_state()
+            st.session_state.model_loaded = True # Force true so UI shows up, but T5 might fail inside
 
         st.markdown("---")
 
@@ -570,12 +683,40 @@ def main():
             st.warning("⚠️ Please load the model first from the sidebar")
         else:
             with st.spinner("🤖 Generating SQL query..."):
-                result = generate_sql_real(
-                    natural_language,
-                    st.session_state.current_database,
-                    temperature,
-                    beam_size
-                )
+                if st.session_state.model_type == "t5":
+                    result = generate_sql_real(
+                        natural_language,
+                        st.session_state.current_database,
+                        temperature,
+                        beam_size
+                    )
+                else:
+                    # LLM Generation
+                    pipeline = load_llm_pipeline()
+                    
+                    # Extract schema (duplicate logic for safety)
+                    try:
+                        import sqlite3
+                        conn = sqlite3.connect(st.session_state.current_database)
+                        cursor = conn.cursor()
+                        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+                        tables = [row[0] for row in cursor.fetchall()]
+                        schema_parts = []
+                        for table in tables:
+                            cursor.execute(f"PRAGMA table_info({table})")
+                            columns = [row[1] for row in cursor.fetchall()]
+                            schema_parts.append(f"{table}({', '.join(columns)})")
+                        schema_str = " | ".join(schema_parts)
+                        conn.close()
+                    except Exception as e:
+                        schema_str = f"database (error retrieving schema: {e})"
+                    
+                    # Generate
+                    result = pipeline.generate(natural_language, schema_str)
+                    
+                    # Update result with UI settings for display consistency
+                    result['temperature'] = temperature
+                    result['beam_size'] = beam_size
 
                 st.session_state.generated_sql = result
 
@@ -617,13 +758,13 @@ def main():
         metric_cols = st.columns(4)
 
         with metric_cols[0]:
-            st.metric("Confidence", f"{result['confidence']:.1%}")
+            st.metric("Confidence", f"{result.get('confidence', 0.0):.1%}")
         with metric_cols[1]:
-            st.metric("Generation Time", f"{result['generation_time']:.2f}s")
+            st.metric("Generation Time", f"{result.get('generation_time', 0.0):.2f}s")
         with metric_cols[2]:
-            st.metric("Tokens", result['tokens_generated'])
+            st.metric("Tokens", result.get('tokens_generated', 0))
         with metric_cols[3]:
-            st.metric("Beam Size", result['beam_size'])
+            st.metric("Beam Size", result.get('beam_size', beam_size))
 
         # Execute query button
         st.markdown("---")
