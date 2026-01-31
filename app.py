@@ -8,6 +8,7 @@ import pandas as pd
 import json
 import os
 import sys
+import sqlite3
 import time
 import random
 import re
@@ -453,7 +454,6 @@ def execute_sql_real(sql: str, db_path: str) -> Tuple[bool, Optional[pd.DataFram
 def display_schema_info(db_path: str):
     """Display database schema information by reading actual database"""
     try:
-        import sqlite3
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
 
@@ -696,7 +696,6 @@ def main():
                     
                     # Extract schema (duplicate logic for safety)
                     try:
-                        import sqlite3
                         conn = sqlite3.connect(st.session_state.current_database)
                         cursor = conn.cursor()
                         cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
@@ -765,6 +764,18 @@ def main():
             st.metric("Tokens", result.get('tokens_generated', 0))
         with metric_cols[3]:
             st.metric("Beam Size", result.get('beam_size', beam_size))
+
+        # Deep Dive Expander
+        if result.get('prompt_used') or result.get('examples_used'):
+            with st.expander("🔍 Deep Dive: How was this query built?"):
+                st.markdown("### 📋 Retrieved Examples (BM25)")
+                st.write("We found these similar questions in our 'Keystore' (train_spider.json) to help the LLM:")
+                for i, (q, s) in enumerate(result.get('examples_used', [])):
+                    st.info(f"**Example {i+1}**\n\n**Q:** {q}\n\n**SQL:** `{s}`")
+                
+                if result.get('prompt_used'):
+                    st.markdown("### 🤖 Full Prompt Sent to LLM")
+                    st.text_area("This is exactly what the LLM saw (Schema + Examples + Your Question):", result['prompt_used'], height=300)
 
         # Execute query button
         st.markdown("---")
