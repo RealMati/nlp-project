@@ -22,13 +22,23 @@ class LLMPipeline:
         start_time = time.time()
         
         # 1. Retrieve specific examples
+        print(f"\n--- [BACKEND FLOW: STEP 1] ---")
+        print(f"Searching Keystore (BM25) for: '{user_question}'")
         examples = self.retriever.retrieve_similar(user_question, k=3)
+        for i, (q, s) in enumerate(examples):
+            print(f"  > Example {i+1} found: Q: '{q}'")
         
         # 2. Build Prompt
+        print(f"\n--- [BACKEND FLOW: STEP 2] ---")
+        print(f"Schema discovered from DB: {schema_info[:200]}...") # Truncated for terminal readability
+        print(f"Building full prompt with {len(examples)} examples...")
         prompt = self.prompt_builder.build_prompt(user_question, schema_info, examples)
         
         # 3. Generate SQL
+        print(f"\n--- [BACKEND FLOW: STEP 3] ---")
+        print(f"Sending to Groq ({self.generator.model})...")
         generated_sql = self.generator.generate_sql(prompt)
+        print(f"  > Received SQL: {generated_sql}\n")
         
         execution_time = time.time() - start_time
         

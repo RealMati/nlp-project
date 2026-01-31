@@ -61,6 +61,8 @@ class Retriever:
         # Get top n documents
         top_n_docs = self.bm25.get_top_n(tokenized_query, self.examples, n=k)
         
+        print(f"DEBUG [Retriever]: Found {len(top_n_docs)} similar examples for query: '{query}'")
+        
         results = []
         for ex in top_n_docs:
             # We return (Question, SQL)

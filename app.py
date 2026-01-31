@@ -706,9 +706,12 @@ def main():
                             columns = [row[1] for row in cursor.fetchall()]
                             schema_parts.append(f"{table}({', '.join(columns)})")
                         schema_str = " | ".join(schema_parts)
+                        print(f"\n--- [BACKEND FLOW: STEP 0] ---")
+                        print(f"Schema string built for LLM: {schema_str[:200]}...")
                         conn.close()
                     except Exception as e:
                         schema_str = f"database (error retrieving schema: {e})"
+                        print(f"ERROR: Failed to extract schema: {e}")
                     
                     # Generate
                     result = pipeline.generate(natural_language, schema_str)
