@@ -62,3 +62,13 @@ This workspace **builds directly on those components** by adding a training + in
 
 - The NatSQL conversion logic is unchanged; the local work focuses on **model training and usage**.
 - If you update schema serialization or prompt format, retrain the adapter for consistent results.
+
+
+## Examples 
+Real SQL (Hard): 
+``SELECT T1.name FROM instructor AS T1 JOIN advisor AS T2 ON T1.ID = T2.i_ID JOIN student AS T3 ON T2.s_ID = T3.ID ORDER BY T3.tot_cred DESC LIMIT 1
+``
+
+NatSQL (Your Data): 
+``select instructor.name from advisor where @.@ join advisor.* order by student.tot_cred desc limit 1
+``
