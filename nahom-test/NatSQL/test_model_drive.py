@@ -1,5 +1,6 @@
 import json
 import re
+import sqlite3
 import torch
 import sys
 import os
@@ -83,7 +84,7 @@ def serialize_schema(db_schema):
 predicted_sqls = []
 predicted_rows = []
 
-max_questions = 10
+max_questions = 100
 subset = dev_data[:max_questions]
 
 print(f"Generating SQL for {len(subset)} questions...")
@@ -174,19 +175,42 @@ def normalize_sql(text: str) -> str:
     text = re.sub(r"\s+", " ", text)
     return text
 
+
+def exec_match(db_path: str, pred_sql: str, gold_sql: str) -> bool:
+    try:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute(pred_sql)
+        pred_res = cursor.fetchall()
+        cursor.execute(gold_sql)
+        gold_res = cursor.fetchall()
+        return pred_res == gold_res
+    except Exception:
+        return False
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
 # Build a metrics JSON with question, prediction, gold, and exact-match metrics
 metrics_rows = []
 exact_match_count = 0
 exact_match_normalized_count = 0
+execution_match_count = 0
 for item, (_, pred_sql) in zip(subset, predicted_rows):
     question = item.get('question', '').strip()
     gold_sql = item.get('query', '').strip()
     pred_sql = pred_sql.strip() if pred_sql else ""
+    db_id = item.get('db_id', '').strip()
+    db_path = os.path.join('data', 'database', db_id, f"{db_id}.sqlite") if db_id else ""
 
     exact_match = pred_sql == gold_sql
     exact_match_normalized = normalize_sql(pred_sql) == normalize_sql(gold_sql)
+    execution_match = exec_match(db_path, pred_sql, gold_sql) if db_path else False
     exact_match_count += int(exact_match)
     exact_match_normalized_count += int(exact_match_normalized)
+    execution_match_count += int(execution_match)
 
     metrics_rows.append({
         "question": question,
@@ -194,22 +218,30 @@ for item, (_, pred_sql) in zip(subset, predicted_rows):
         "gold": gold_sql,
         "exact_match": exact_match,
         "exact_match_normalized": exact_match_normalized,
+        "execution_match": execution_match,
     })
 
 metrics_summary = {
     "count": len(metrics_rows),
     "exact_match": exact_match_count,
     "exact_match_normalized": exact_match_normalized_count,
+    "execution_match": execution_match_count,
     "exact_match_rate": exact_match_count / max(len(metrics_rows), 1),
     "exact_match_normalized_rate": exact_match_normalized_count / max(len(metrics_rows), 1),
+    "execution_match_rate": execution_match_count / max(len(metrics_rows), 1),
 }
 
 with open(metrics_output_file, 'w') as f:
     json.dump({"summary": metrics_summary, "rows": metrics_rows}, f, indent=2)
 
-print("Running official evaluation...")
+eval_output_file = 'evaluator_result.json'
+print(f"Running official evaluation (execution + exact match)... saving to {eval_output_file}")
 
 
 # Call the evaluation script from the spider folder
-# We check for exact match first
-os.system(f"python ./evaluation.py --gold {gold_output_file} --pred {output_file} --db data/database --table data/tables.json --etype match")
+# Evaluate both execution accuracy and exact match
+python_exec = sys.executable or "python3"
+os.system(
+    f"{python_exec} ./evaluation.py --gold {gold_output_file} --pred {output_file} "
+    f"--db data/database --table data/tables.json --etype all > {eval_output_file}"
+)
